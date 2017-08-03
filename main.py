@@ -24,7 +24,7 @@ batch_size = 64
 learning_rate = 1e-4
 iters = 45000
 
-mode = 'stage1' # stage1, stage2, test
+mode = 'test' # stage1, stage2, test
 log_path = 'stage1_log/'
 model_path = 'stage1_model/model_20170802/'
 model_path2 = 'stage2_model/model_20170802/'
