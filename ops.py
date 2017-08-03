@@ -25,8 +25,8 @@ def pad_numbers_plus(in_width, filter_size, stride):
     else:
         return [(p//2)+1, p//2]
 
-def conv2d(batch_input, out_channels, filter_shape, strides):
-    with tf.variable_scope("conv"):
+def conv2d(batch_input, out_channels, filter_shape, strides, name="conv"):
+    with tf.variable_scope(name):
         in_channels = batch_input.get_shape()[1]
         in_height = batch_input.get_shape()[2]
         in_width = batch_input.get_shape()[3]
@@ -48,8 +48,8 @@ def conv2d(batch_input, out_channels, filter_shape, strides):
         conv = tf.nn.conv2d(padded_input, w, strides, padding="VALID", data_format="NCHW")
         return conv
 
-def deconv_up(batch_input, out_channels, filter_shape, strides):
-    with tf.variable_scope("deconv"):
+def deconv_up(batch_input, out_channels, filter_shape, strides, name="deconv"):
+    with tf.variable_scope(name):
         in_channels = batch_input.get_shape()[1]
         kh, kw = filter_shape
         _, _, sh, sw = strides
@@ -75,8 +75,8 @@ def deconv_up(batch_input, out_channels, filter_shape, strides):
 
         return conv
 
-def deconv2D_up(batch_input, out_channels, filter_shape, strides):
-    with tf.variable_scope("deconv"):
+def deconv2D_up(batch_input, out_channels, filter_shape, strides, name="deconv"):
+    with tf.variable_scope(name):
         in_channels = batch_input.get_shape()[1]
         kh, kw = filter_shape
         _, _, sh, sw = strides
@@ -136,17 +136,18 @@ def prelu(x, name='prelu'):
         neg = alpha * (x - tf.abs(x)) * .5
     return pos + neg
 
-def activation(x,name='relu'):
-    if name == 'prelu':
-        return prelu(x)
-    elif name == 'lrelu':
-        return lrelu(x,0.2)
-    elif name == 'tanh':
-        return tf.nn.tanh(x)
-    elif name == 'relu' :
-        return tf.nn.relu(x)
-    else:
-        return None
+def activation(x,name='relu', act_name='activation'):
+    with tf.variable_scope(act_name):
+        if name == 'prelu':
+            return prelu(x)
+        elif name == 'lrelu':
+            return lrelu(x,0.2)
+        elif name == 'tanh':
+            return tf.nn.tanh(x)
+        elif name == 'relu' :
+            return tf.nn.relu(x)
+        else:
+            return None
 
 def batchnorm(input):
     with tf.variable_scope("batchnorm"):

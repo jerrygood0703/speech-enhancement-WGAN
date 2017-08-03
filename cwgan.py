@@ -147,13 +147,14 @@ class GradientPenaltyWGAN(object):
             while not coord.should_stop():
                 for i in range(iters):
                     if i%100==0:
-                        _, summary, loss_d = self.sess.run([self.d_opt, d_merged, self.loss['l_D']])    
-                        D_writer.add_summary(summary, i)
+                        loss_d = 0.0
+                        # _, summary, loss_d = self.sess.run([self.d_opt, d_merged, self.loss['l_D']])    
+                        # D_writer.add_summary(summary, i)
                         _, summary, loss_g = self.sess.run([self.g_opt, g_merged, self.loss['l_G']])
                         G_writer.add_summary(summary, i)
                         print("\rIter:{} LD:{} LG:{}".format(i, loss_d, loss_g))
                     else:
-                        _ = self.sess.run([self.d_opt])  
+                        # _ = self.sess.run([self.d_opt])  
                         _ = self.sess.run([self.g_opt])
 
                     if i % 5000 == 4999:
