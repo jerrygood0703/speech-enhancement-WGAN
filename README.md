@@ -4,6 +4,8 @@
 
 Best configuration so far!!
 
+**On waveform**
+
 | Metrics       | PESQ         |    SSNR    |     STOI    |
 | ------------- | ------------ | ---------- | ----------- |
 | Noisy         | 1.9701       | -0.0691    | 0.9210      |
