@@ -30,14 +30,14 @@ class GradientPenaltyWGAN(object):
                 data_noisy, data_clean, 
                 log_path, model_path, model_path2,
                 use_waveform, 
-                lr=1e-4, gan_lamb=0.):
+                lr=1e-4, gan_lamb=1.):
 
         self.model_path = model_path
         self.model_path2 = model_path2
         self.log_path = log_path
 
         self.lamb_gp = 10.0
-        self.lamb_recon = 1.0
+        self.lamb_recon = 100.0
         self.gan_lamb = gan_lamb
         self.lr = lr
         self.g_net = g_net
@@ -48,6 +48,7 @@ class GradientPenaltyWGAN(object):
 
         self.d_real = self.d_net(self.noisy, self.clean, reuse=False)
         self.d_fake = self.d_net(self.noisy, self.enhanced, reuse=True)
+        self.d_fake2 = self.d_net(self.noisy, self.enhanced, reuse=True)
         e = tf.random_uniform([tf.shape(self.noisy)[0], 1, 1, 1], 0., 1., name='epsilon')
         x_intp = self.clean + e * (self.enhanced - self.clean) 
         d_intp = self.d_net(self.noisy, x_intp, reuse=True)
@@ -147,14 +148,13 @@ class GradientPenaltyWGAN(object):
             while not coord.should_stop():
                 for i in range(iters):
                     if i%100==0:
-                        loss_d = 0.0
-                        # _, summary, loss_d = self.sess.run([self.d_opt, d_merged, self.loss['l_D']])    
-                        # D_writer.add_summary(summary, i)
+                        _, summary, loss_d = self.sess.run([self.d_opt, d_merged, self.loss['l_D']])    
+                        D_writer.add_summary(summary, i)
                         _, summary, loss_g = self.sess.run([self.g_opt, g_merged, self.loss['l_G']])
                         G_writer.add_summary(summary, i)
                         print("\rIter:{} LD:{} LG:{}".format(i, loss_d, loss_g))
                     else:
-                        # _ = self.sess.run([self.d_opt])  
+                        _ = self.sess.run([self.d_opt])  
                         _ = self.sess.run([self.g_opt])
 
                     if i % 5000 == 4999:
@@ -256,15 +256,33 @@ class GradientPenaltyWGAN(object):
                 wav.write(test_path+"enhanced/"+name.split('/')[-1],16000,np.int16(y_out*32767))
             # For waveform data
             else:
-                temp = np.zeros(((y.shape[0]//FRAMELENGTH+1)*FRAMELENGTH))
+                # temp = np.zeros(((y.shape[0]//FRAMELENGTH+1)*FRAMELENGTH))
+                # temp[:y.shape[0]] = y
+                # wav_data = temp
+                # signals = slice_signal(wav_data, FRAMELENGTH, OVERLAP)
+                # wave = (2./65535.) * (signals.astype(np.float32)-32767) + 1.
+                # print(np.max(wave),np.min(wave))
+                # wave = np.reshape(wave,(wave.shape[0],1,-1,1))
+                # output = self.sess.run(enhanced,{x_test:wave})
+                # output = output.flatten()
+                # output = output[:y.shape[0]]
+                # print(np.max(output),np.min(output))
+                # wav.write(test_path+"enhanced/"+name.split('/')[-1],16000,np.int16(output*32767))
+
+                pad_num = OVERLAP * np.ceil((y.shape[0] - FRAMELENGTH)*1. / OVERLAP) + FRAMELENGTH
+                temp = np.zeros(int(pad_num))
+                out_temp = np.zeros(int(pad_num))
+                sample_weight = np.zeros(int(pad_num))
                 temp[:y.shape[0]] = y
-                wav_data = temp
-                signals = slice_signal(wav_data, FRAMELENGTH, OVERLAP)
+                signals = slice_signal(temp, FRAMELENGTH, OVERLAP)
                 wave = (2./65535.) * (signals.astype(np.float32)-32767) + 1.
                 print(np.max(wave),np.min(wave))
-                wave = np.reshape(wave,(wave.shape[0],1,-1,1))
-                output = self.sess.run(enhanced,{x_test:wave})
-                output = output.flatten()
-                output = output[:y.shape[0]]
+                for idx, w in enumerate(wave):
+                    w = np.reshape(w,(1,1,-1,1))
+                    o =  self.sess.run(enhanced,{x_test:w})
+                    out_temp[idx*OVERLAP:idx*OVERLAP+FRAMELENGTH] += o[0,0,:,0]
+                    sample_weight[idx*OVERLAP:idx*OVERLAP+FRAMELENGTH] += 1
+                out_temp = out_temp/sample_weight
+                output = out_temp[:y.shape[0]]
                 print(np.max(output),np.min(output))
                 wav.write(test_path+"enhanced/"+name.split('/')[-1],16000,np.int16(output*32767))
