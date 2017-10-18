@@ -29,16 +29,16 @@ class Generator(object):
                 layers.append(output)
 
                 layer_specs = [
-                    ngf * 1, # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
-                    ngf * 2, # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
-                    ngf * 2, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
-                    ngf * 4, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
-                    ngf * 4, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
-                    ngf * 8, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
-                    ngf * 8, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
-                    ngf * 16, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
-                    ngf * 16, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
-                    ngf * 32, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
+                    ngf * 1, 
+                    ngf * 2, 
+                    ngf * 2,
+                    ngf * 4, 
+                    ngf * 4,
+                    ngf * 8,
+                    ngf * 8,
+                    ngf * 16,
+                    ngf * 16, 
+                    ngf * 32,
                 ]
 
                 for out_channels in layer_specs:
@@ -51,16 +51,16 @@ class Generator(object):
             
             # ---------------------------------------------------------------------- #
             layer_specs = [
-                (ngf * 32, 0.5),   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
-                (ngf * 16, 0.5),   # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
-                (ngf * 16, 0.5),   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
-                (ngf * 8, 0.5),   # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
-                (ngf * 8, 0.5),   # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
-                (ngf * 4, 0.5),   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
-                (ngf * 4, 0.5),   # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
-                (ngf * 2, 0.5),   # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
-                (ngf * 2, 0.0),   # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
-                (ngf * 1, 0.0),   # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
+                (ngf * 32, 0.5),
+                (ngf * 16, 0.5),
+                (ngf * 16, 0.5),
+                (ngf * 8, 0.5),
+                (ngf * 8, 0.5), 
+                (ngf * 4, 0.5),
+                (ngf * 4, 0.5),
+                (ngf * 2, 0.5),
+                (ngf * 2, 0.0),
+                (ngf * 1, 0.0),
             ]
             with tf.device('/gpu:0'):
                 num_encoder_layers = len(layers)
