@@ -36,19 +36,18 @@ class GradientPenaltyWGAN(object):
         self.model_path2 = model_path2
         self.log_path = log_path
 
-        self.lamb_gp = 10.0
+        self.lamb_gp = 10.
         self.lamb_recon = 100.0
         self.gan_lamb = gan_lamb
         self.lr = lr
         self.g_net = g_net
         self.d_net = d_net
-        self.noisy = data_noisy
-        self.clean = data_clean
+        self.noisy = data_noisy # noisy data shape [batch_size,1,257,8*8]
+        self.clean = data_clean		     # # clean data shape [batch_size,1,257,8*8]
         self.enhanced = self.g_net(self.noisy, reuse=False)
 
         self.d_real = self.d_net(self.noisy, self.clean, reuse=False)
         self.d_fake = self.d_net(self.noisy, self.enhanced, reuse=True)
-        self.d_fake2 = self.d_net(self.noisy, self.enhanced, reuse=True)
         e = tf.random_uniform([tf.shape(self.noisy)[0], 1, 1, 1], 0., 1., name='epsilon')
         x_intp = self.clean + e * (self.enhanced - self.clean) 
         d_intp = self.d_net(self.noisy, x_intp, reuse=True)
@@ -154,7 +153,8 @@ class GradientPenaltyWGAN(object):
                         G_writer.add_summary(summary, i)
                         print("\rIter:{} LD:{} LG:{}".format(i, loss_d, loss_g))
                     else:
-                        _ = self.sess.run([self.d_opt])  
+                        for _ in range(5):
+                            _ = self.sess.run([self.d_opt])  
                         _ = self.sess.run([self.g_opt])
 
                     if i % 5000 == 4999:

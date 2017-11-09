@@ -46,7 +46,7 @@ class Generator(object):
                     rectified = activation(layers[-1], 'prelu', name+'_activation')
                     # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
                     output = conv2d(rectified, out_channels, [11,1], [1,1,2,1], name=name)
-                    # output = batchnorm(convolved, axis=[1, 2, 3], name='G_layernorm')
+                    output = tf.layers.batch_normalization(output, axis=1, name=name+'_bn')
                     layers.append(output)
             
             # ---------------------------------------------------------------------- #
@@ -77,7 +77,7 @@ class Generator(object):
                     rectified = activation(input, 'prelu', name+'_activation')
                     # [batch, in_height, in_width, in_channels] => [batch, in_height*2, in_width*2, out_channels]
                     output = deconv_up(rectified, out_channels, [11,1], [1,1,1,1], name=name)
-                    # output = batchnorm(output)
+                    output = tf.layers.batch_normalization(output, axis=1, name=name+'_bn')
 
                     # if dropout > 0.0:
                     #     output = tf.nn.dropout(output, keep_prob=1 - dropout)
@@ -116,8 +116,8 @@ class Discriminator(object):
                 # 2x [batch, in_channels, height, width] => [batch, in_channels * 2, height, width]
                 input = tf.concat([noisy, clean], axis=1)
                 name = 'dlayer_1'
-                convolved = conv2d(input, ndf, [3,1], [1,1,2,1], name=name)
-                rectified = activation(convolved, 'lrelu', name+'_activation')
+                conved = conv2d(input, ndf, [3,1], [1,1,2,1], name=name)
+                rectified = activation(conved, 'lrelu', name+'_activation')
                 layers.append(rectified)
 
                 # layer_2: [batch, 128, 128, ndf] => [batch, 64, 64, ndf * 2]
@@ -127,15 +127,15 @@ class Discriminator(object):
                     name = "dlayer_%d" % (len(layers) + 1)
                     out_channels = ndf * min(2**(i+1), 8)
                     stride = 1 if i == n_layers - 1 else 2  # last layer here has stride 1
-                    convolved = conv2d(layers[-1], out_channels, [3,1], [1,1,stride,1], name=name)
-                    normalized = layernorm(convolved, axis=[1, 2, 3], name=name+'_layernorm')
+                    conved = conv2d(layers[-1], out_channels, [3,1], [1,1,stride,1], name=name)
+                    normalized = layernorm(conved, axis=[1, 2, 3], name=name+'_layernorm')
                     rectified = activation(normalized, 'lrelu', name+'_activation')
                     layers.append(rectified)
 
                 # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
                 name = "dlayer_%d" % (len(layers) + 1)
-                convolved = conv2d(layers[-1], 1, [3,1], [1,1,1,1], name=name)
-                normalized = layernorm(convolved, axis=[1, 2, 3], name=name+'_layernorm')
+                conved = conv2d(layers[-1], 1, [3,1], [1,1,1,1], name=name)
+                normalized = layernorm(conved, axis=[1, 2, 3], name=name+'_layernorm')
                 rectified = activation(normalized, 'lrelu', name+'_activation')
                 layers.append(rectified)
 

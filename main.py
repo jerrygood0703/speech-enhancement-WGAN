@@ -24,11 +24,11 @@ batch_size = 64
 learning_rate = 1e-4
 iters = 45000
 
-mode = 'stage2' # stage1, stage2, test
-log_path = 'stage2_log/'
-model_path = 'stage1_model/model_20170802/'
-model_path2 = 'stage2_model/model_20170802/'
-test_path = model_path2 # switch between stage1 and stage2
+mode = 'stage1' # stage1, stage2, test
+log_path = 'stage1_log/'
+model_path = 'stage1_model/model_20171109/'
+model_path2 = 'stage2_model/model_20171109/'
+test_path = model_path # switch between stage1 and stage2
 test_list = "/mnt/gv0/user_sylar/segan_data/noisy_test_list"
 record_name = "/data_wave.tfrecord"
 
