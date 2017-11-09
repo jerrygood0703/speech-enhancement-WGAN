@@ -12,6 +12,7 @@ import random
 import collections
 import math
 import time
+import sys
 
 from data_utils import *
 from ops import *
@@ -23,6 +24,7 @@ use_waveform = True
 batch_size = 64
 learning_rate = 1e-4
 iters = 45000
+
 
 mode = 'stage1' # stage1, stage2, test
 log_path = 'stage1_log/'
