@@ -45,7 +45,7 @@ class spec_Generator(object):
                     output = tf.layers.batch_normalization(output, axis=1, name=name+'_bn')
 
                     layers.append(output)
-            
+        
             # ---------------------------------------------------------------------- #
             layer_specs = [
                 (ngf * 32, 0.5),   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
