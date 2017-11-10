@@ -72,9 +72,11 @@ class GradientPenaltyWGAN(object):
         W_dist = tf.summary.scalar('W_dist', self.loss['W_dist'])
         #tf.summary.histogram('d_real', self.d_real)
         #tf.summary.histogram('d_fake', self.d_fake)
-        audio_summ = tf.summary.audio('enhanced', tf.reshape(self.enhanced,(int(self.enhanced.get_shape()[0]), -1)), 16000)
-
-        self.g_summs = [E_fake, G_recon, audio_summ]
+        if use_waveform:
+            audio_summ = tf.summary.audio('enhanced', tf.reshape(self.enhanced,(int(self.enhanced.get_shape()[0]), -1)), 16000)
+            self.g_summs = [E_fake, G_recon, audio_summ]
+        else:
+            self.g_summs = [E_fake, G_recon]
         self.d_summs = [E_real, E_fake, l_D, l_gp, W_dist]
 
         self.d_opt, self.g_opt = None, None
@@ -212,8 +214,8 @@ class GradientPenaltyWGAN(object):
             return result
 
         if x_test.get_shape()[3] > 1:
-            FRAMELENGTH = 32
-            OVERLAP = 32
+            FRAMELENGTH = 64
+            OVERLAP = 2
         else:
             FRAMELENGTH = 16384
             OVERLAP = 16384  
@@ -238,20 +240,33 @@ class GradientPenaltyWGAN(object):
                 if y.dtype!='float32':
                     y = np.float32(y/32767.)
                 spec, phase, mean, std = make_spectrum_phase(y, FRAMELENGTH, OVERLAP)
+                print(spec.shape)
+
+                # Padding spectrum
+                pad_num = OVERLAP * np.ceil((spec.shape[1] - FRAMELENGTH)*1. / OVERLAP) + FRAMELENGTH
+                temp = np.zeros((257, int(pad_num)))
+                temp[:, :spec.shape[1]] = temp[:, :spec.shape[1]] + spec
+                print(temp.shape)
+
                 slices = []
                 for i in range(0, spec.shape[1]-FRAMELENGTH, OVERLAP):
                     slices.append(spec[:,i:i+FRAMELENGTH])
-                slices = np.array(slices).reshape((-1,1,257,32))
+                slices = np.array(slices).reshape((-1,1,257,FRAMELENGTH))
                 output = self.sess.run(enhanced,{x_test:slices})
-                count = 0
-                for i in range(0, spec.shape[1]-FRAMELENGTH, OVERLAP):
-                    spec[:,i:i+FRAMELENGTH] = output[count,:,:,:]
-                    count+=1
-                print(i)
-                # The un-enhanced part of spec should be un-normalized
-                spec[:, i:] = (spec[:, i:] * std) + mean
 
-                recons_y = recons_spec_phase(spec, phase)             
+                sample_weight = np.zeros((257, spec.shape[1]))
+                temp = np.zeros((257, spec.shape[1]))
+                count = 0
+                for i in range(0, temp.shape[1]-FRAMELENGTH, OVERLAP):
+                    temp[:,i:i+FRAMELENGTH] = temp[:,i:i+FRAMELENGTH] + output[count,:,:,:]
+                    sample_weight[:,i:i+FRAMELENGTH] += 1
+                    count+=1
+                temp = temp / sample_weight
+                # print(i)
+                # The un-enhanced part of spec should be un-normalized
+                # spec[:, i:] = (spec[:, i:] * std) + mean
+
+                recons_y = recons_spec_phase(temp, phase)             
                 y_out = librosa.util.fix_length(recons_y, y.shape[0])
                 wav.write(test_path+"enhanced/"+name.split('/')[-1],16000,np.int16(y_out*32767))
             # For waveform data

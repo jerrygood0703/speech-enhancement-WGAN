@@ -20,19 +20,19 @@ from model import *
 from dnn_model import *
 from cwgan import *
 
-use_waveform = True
+use_waveform = False
 batch_size = 64
 learning_rate = 1e-4
 iters = 45000
 
 
-mode = 'stage1' # stage1, stage2, test
-log_path = 'stage1_log/'
-model_path = 'stage1_model/model_20171109/'
-model_path2 = 'stage2_model/model_20171109/'
+mode = 'test' # stage1, stage2, test
+log_path = 'stage2_log/'
+model_path = 'stage1_model/model_20171109-spec/'
+model_path2 = 'stage2_model/model_20171109-spec/'
 test_path = model_path # switch between stage1 and stage2
 test_list = "/mnt/gv0/user_sylar/segan_data/noisy_test_list"
-record_name = "/data_wave.tfrecord"
+record_name = "/data_spec.tfrecord"
 
 if use_waveform:
     G=Generator((1,2,3),(1,2,3))
@@ -60,7 +60,7 @@ if mode=='test':
     if use_waveform:
         x_test = tf.placeholder("float", [None, 1, 16384, 1], name='test_noisy')
     else:
-        x_test = tf.placeholder("float", [None, 1, 257, 32], name='test_noisy')
+        x_test = tf.placeholder("float", [None, 1, 257, 64], name='test_noisy')
     gan.test(x_test, test_path, test_list)
 else:
     gan.train(mode, iters)

@@ -27,7 +27,7 @@ class dataPreprocessor(object):
             self.OVERLAP = self.FRAMELENGTH//2
         else:
             self.FRAMELENGTH = 8*8
-            self.OVERLAP = self.FRAMELENGTH//8
+            self.OVERLAP = self.FRAMELENGTH//2
 
         if noisy_filelist and clean_filelist:
             print('Write records')
