@@ -26,13 +26,13 @@ learning_rate = 1e-4
 iters = 45000
 
 
-mode = 'stage1' # stage1, stage2, test
+mode = sys.argv[1] # stage1, stage2, test
 log_path = 'stage2_log/'
-model_path = 'stage1_model/model_20171110-spec/'
-model_path2 = 'stage2_model/model_20171110-spec/'
+model_path = 'stage1_model/model_20171111-mask/'
+model_path2 = 'stage2_model/model_20171111-mask/'
 test_path = model_path # switch between stage1 and stage2
-test_list = "/mnt/gv0/user_sylar/segan_data/noisy_test_list"
-record_name = "/data_spec.tfrecord"
+test_list = "/mnt/gv0/user_sylar/TMHINT/tsnoisylist"#segan_data/noisy_test_list"
+record_name = "/data_mask.tfrecord"
 
 if use_waveform:
     G=Generator((1,2,3),(1,2,3))
@@ -52,9 +52,9 @@ check_dir(model_path2)
 
 with tf.device('cpu'):
     reader = dataPreprocessor(record_name, use_waveform=use_waveform)
-    clean, noisy = reader.read_and_decode(batch_size=batch_size,num_threads=32)
+    mask, clean, noisy = reader.read_and_decode(batch_size=batch_size,num_threads=32)
 #with tf.device('gpu'):
-gan = GradientPenaltyWGAN(G,D,noisy,clean,log_path,model_path,model_path2,use_waveform,lr=learning_rate)
+gan = GradientPenaltyWGAN(G,D,mask, noisy,clean,log_path,model_path,model_path2,use_waveform,lr=learning_rate)
 
 if mode=='test':
     if use_waveform:

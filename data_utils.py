@@ -19,7 +19,7 @@ class dataPreprocessor(object):
         self.noisy_filelist = noisy_filelist
         self.clean_filelist = clean_filelist
         self.use_waveform = use_waveform
-        self.record_path = "/mnt/gv0/user_sylar/segan_data"
+        self.record_path = "/mnt/gv0/user_sylar/TMHINT"
         self.record_name = record_name
 
         if use_waveform:
@@ -59,15 +59,17 @@ class dataPreprocessor(object):
         signals = self.slice_signal(wav_data, self.FRAMELENGTH, self.OVERLAP)
         return signals  
 
-    def make_spectrum(self, filename, use_normalize):
-        sr, y = wav.read(filename)
-        if sr != 16000:
-            raise ValueError('Sampling rate is expected to be 16kHz!')
-        if y.dtype!='float32':
-            y = np.float32(y/32767.)
+    def make_spectrum(self, y, use_normalize, use_log=False):
+        # sr, y = wav.read(filename)
+        # if sr != 16000:
+        #     raise ValueError('Sampling rate is expected to be 16kHz!')
+        # if y.dtype!='float32':
+        #     y = np.float32(y/32767.)
 
         D=librosa.stft(y,n_fft=512,hop_length=256,win_length=512,window=scipy.signal.hamming)
-        Sxx=np.log10(abs(D)**2) 
+        Sxx=abs(D)**2
+        if use_log:
+            Sxx = np.log10(Sxx)
         if use_normalize:
             mean = np.mean(Sxx, axis=1).reshape((257,1))
             std = np.std(Sxx, axis=1).reshape((257,1))+1e-12
@@ -99,8 +101,8 @@ class dataPreprocessor(object):
                 wav_signals = self.read_and_slice(c)
                 noisy_signals = self.read_and_slice(n)
                 print(wav_signals)            
-                for (wav, noisy) in zip(wav_signals, noisy_signals):
-                    wav_raw = wav.tostring()
+                for (wave, noisy) in zip(wav_signals, noisy_signals):
+                    wav_raw = wave.tostring()
                     noisy_raw = noisy.tostring()
                     example = tf.train.Example(features=tf.train.Features(feature={
                         'wav_raw': _bytes_feature(wav_raw),
@@ -111,15 +113,33 @@ class dataPreprocessor(object):
         else:
             for n,c in zip(nlist, clist):
                 print(n,c)
-                wav_signals = self.make_spectrum(c, False)
-                noisy_signals = self.make_spectrum(n, True)
-                for (wav, noisy) in zip(wav_signals, noisy_signals):
-                    print(wav.shape, noisy.shape)
-                    wav_raw = wav.tostring()
+                # Power spectra
+                sr, y = wav.read(n)
+                sr, noise = wav.read(c)
+                if y.dtype!='float32':
+                    y = np.float32(y/32767.)
+                if noise.dtype!='float32':
+                    noise = np.float32(noise/32767.)
+                s = y - noise
+                clean_signals = self.make_spectrum(s, False)
+                noise_signals = self.make_spectrum(noise, False)
+                noisy_signals = self.make_spectrum(y, True, True)
+                mask_signals = clean_signals / (clean_signals + noise_signals)
+                clean_signals = np.log10(clean_signals + 1e-12)
+
+                print(np.max(noisy_signals), np.min(noisy_signals))
+                print(np.max(clean_signals), np.min(clean_signals))
+                print(np.max(mask_signals), np.min(mask_signals))
+
+                for (mask, wave, noisy) in zip(mask_signals, clean_signals, noisy_signals):
+                    # print(mask.shape, noisy.shape)
+                    mask_raw = mask.tostring()
+                    wav_raw = wave.tostring()
                     noisy_raw = noisy.tostring()
                     example = tf.train.Example(features=tf.train.Features(feature={
                         'wav_raw': _bytes_feature(wav_raw),
-                        'noisy_raw': _bytes_feature(noisy_raw)}))
+                        'noisy_raw': _bytes_feature(noisy_raw),
+                        'mask_raw': _bytes_feature(mask_raw)}))
                     out_file.write(example.SerializeToString())
             out_file.close()             
 
@@ -132,6 +152,7 @@ class dataPreprocessor(object):
                 features={
                     'wav_raw': tf.FixedLenFeature([], tf.string),
                     'noisy_raw': tf.FixedLenFeature([], tf.string),
+                    'mask_raw': tf.FixedLenFeature([], tf.string),
                 })
         if self.use_waveform:
             wave = tf.decode_raw(features['wav_raw'], tf.int32)
@@ -143,17 +164,19 @@ class dataPreprocessor(object):
             noisy = (2./65535.) * tf.cast((noisy - 32767), tf.float32) + 1.
             noisy = tf.reshape(noisy, [1,-1,1])
         else:
+            mask = tf.decode_raw(features['mask_raw'], tf.float32)
+            mask = tf.reshape(mask,[1,257,self.FRAMELENGTH])
             wave = tf.decode_raw(features['wav_raw'], tf.float32)
             wave = tf.reshape(wave,[1,257,self.FRAMELENGTH])
             noisy = tf.decode_raw(features['noisy_raw'], tf.float32)
             noisy = tf.reshape(noisy,[1,257,self.FRAMELENGTH])
 
-        wavebatch, noisybatch = tf.train.shuffle_batch([wave,
+        maskbatch, wavebatch, noisybatch = tf.train.shuffle_batch([mask, wave,
                                              noisy],
                                              batch_size=batch_size,
                                              num_threads=num_threads,
                                              capacity=1000 + 3 * batch_size,
                                              min_after_dequeue=1000,
                                              name='wav_and_noisy')
-        return wavebatch, noisybatch
+        return maskbatch, wavebatch, noisybatch
  

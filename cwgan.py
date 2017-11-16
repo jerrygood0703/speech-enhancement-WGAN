@@ -6,6 +6,7 @@ import tensorflow as tf
 import numpy as np
 from ops import *
 import re
+import os
 
 class GradientPenaltyWGAN(object):
     '''
@@ -27,7 +28,7 @@ class GradientPenaltyWGAN(object):
     # penalty = tf.square(tf.nn.relu(grad_norm - 1.)) # FIXME: experimental
     '''
     def __init__(self, g_net, d_net, 
-                data_noisy, data_clean, 
+                data_mask, data_noisy, data_clean, 
                 log_path, model_path, model_path2,
                 use_waveform, 
                 lr=1e-4, gan_lamb=1.):
@@ -37,29 +38,30 @@ class GradientPenaltyWGAN(object):
         self.log_path = log_path
 
         self.lamb_gp = 10.
-        self.lamb_recon = 100.0
+        self.lamb_recon = 100.
         self.gan_lamb = gan_lamb
         self.lr = lr
         self.g_net = g_net
         self.d_net = d_net
         self.noisy = data_noisy # noisy data shape [batch_size,1,257,8*8]
         self.clean = data_clean		     # # clean data shape [batch_size,1,257,8*8]
+        self.mask = data_mask
         self.enhanced = self.g_net(self.noisy, reuse=False)
 
-        self.d_real = self.d_net(self.noisy, self.clean, reuse=False)
+        self.d_real = self.d_net(self.noisy, self.mask, reuse=False)
         self.d_fake = self.d_net(self.noisy, self.enhanced, reuse=True)
         e = tf.random_uniform([tf.shape(self.noisy)[0], 1, 1, 1], 0., 1., name='epsilon')
-        x_intp = self.clean + e * (self.enhanced - self.clean) 
+        x_intp = self.mask + e * (self.enhanced - self.mask) 
         d_intp = self.d_net(self.noisy, x_intp, reuse=True)
         self.gp = self._compute_gradient_penalty(d_intp, x_intp)
 
         self.loss = dict()
         self.loss['E_real'] = tf.reduce_mean(self.d_real)
         self.loss['E_fake'] = tf.reduce_mean(self.d_fake)
-        # loss['G_recon'] = tf.reduce_mean(tf.abs(enhanced-clean))
-        self.loss['G_recon'] = tf.reduce_mean(tf.squared_difference(self.enhanced, self.clean))
+        self.loss['G_recon'] = tf.reduce_mean(tf.squared_difference(self.enhanced, self.mask))
+        # self.loss['G_mask'] = tf.reduce_mean(tf.squared_difference(self.masked, self.clean))
         self.loss['W_dist'] = self.loss['E_real'] - self.loss['E_fake']
-        self.loss['l_G'] = self.gan_lamb * (-self.loss['E_fake']) + self.lamb_recon * self.loss['G_recon']
+        self.loss['l_G'] = self.gan_lamb * (-self.loss['E_fake']) + self.lamb_recon * (self.loss['G_recon'] )#+ self.loss['G_mask'])
         self.loss['l_D'] = self.gan_lamb * (-self.loss['W_dist'] + self.lamb_gp * self.gp)
 
         # # For summaries
@@ -68,6 +70,7 @@ class GradientPenaltyWGAN(object):
         E_fake = tf.summary.scalar('E_fake', self.loss['E_fake'])
         l_D = tf.summary.scalar('l_D', self.loss['l_D'])
         G_recon = tf.summary.scalar('G_recon', self.loss['G_recon'])
+        # G_mask = tf.summary.scalar('G_mask', self.loss['G_mask'])
         l_gp = tf.summary.scalar('gp', self.gp)
         W_dist = tf.summary.scalar('W_dist', self.loss['W_dist'])
         #tf.summary.histogram('d_real', self.d_real)
@@ -76,7 +79,7 @@ class GradientPenaltyWGAN(object):
             audio_summ = tf.summary.audio('enhanced', tf.reshape(self.enhanced,(int(self.enhanced.get_shape()[0]), -1)), 16000)
             self.g_summs = [E_fake, G_recon, audio_summ]
         else:
-            self.g_summs = [E_fake, G_recon]
+            self.g_summs = [E_fake, G_recon]#, G_mask]
         self.d_summs = [E_real, E_fake, l_D, l_gp, W_dist]
 
         self.d_opt, self.g_opt = None, None
@@ -230,6 +233,7 @@ class GradientPenaltyWGAN(object):
             saver.restore(self.sess, test_path + "model-" + latest_step)
 
         enhanced = self.g_net(x_test, reuse=True)
+
         nlist = [_[:-1] for _ in open(test_list).readlines()]
         for name in nlist:
             sr, y = wav.read(name)
@@ -246,29 +250,34 @@ class GradientPenaltyWGAN(object):
                 pad_num = OVERLAP * np.ceil((spec.shape[1] - FRAMELENGTH)*1. / OVERLAP) + FRAMELENGTH
                 temp = np.zeros((257, int(pad_num)))
                 temp[:, :spec.shape[1]] = temp[:, :spec.shape[1]] + spec
-                print(temp.shape)
+                # print(temp.shape)
 
                 slices = []
                 for i in range(0, spec.shape[1]-FRAMELENGTH, OVERLAP):
                     slices.append(spec[:,i:i+FRAMELENGTH])
                 slices = np.array(slices).reshape((-1,1,257,FRAMELENGTH))
                 output = self.sess.run(enhanced,{x_test:slices})
+                # print(output.shape)
+
 
                 sample_weight = np.zeros((257, spec.shape[1]))
-                temp = np.zeros((257, spec.shape[1]))
+                temp_out = np.zeros((257, spec.shape[1]))
                 count = 0
                 for i in range(0, temp.shape[1]-FRAMELENGTH, OVERLAP):
-                    temp[:,i:i+FRAMELENGTH] = temp[:,i:i+FRAMELENGTH] + output[count,:,:,:]
+                    temp_out[:,i:i+FRAMELENGTH] += (np.log10(output[count,0,:,:]) + temp[:,i:i+FRAMELENGTH])
                     sample_weight[:,i:i+FRAMELENGTH] += 1
                     count+=1
-                temp = temp / sample_weight
+                temp_out = temp_out / sample_weight
+                print(temp_out.shape)
                 # print(i)
                 # The un-enhanced part of spec should be un-normalized
                 # spec[:, i:] = (spec[:, i:] * std) + mean
 
-                recons_y = recons_spec_phase(temp, phase)             
+                recons_y = recons_spec_phase(temp_out, phase)             
                 y_out = librosa.util.fix_length(recons_y, y.shape[0])
-                wav.write(test_path+"enhanced/"+name.split('/')[-1],16000,np.int16(y_out*32767))
+                temp_name = name.split('/')
+                wav.write(os.path.join(test_path,"enhanced",temp_name[-3],temp_name[-2],temp_name[-1]),16000,np.int16(y_out*32767))
+                # wav.write(test_path+"enhanced/"+name.split('/')[-1],16000,np.int16(y_out*32767))
             # For waveform data
             else:
                 # temp = np.zeros(((y.shape[0]//FRAMELENGTH+1)*FRAMELENGTH))
@@ -300,4 +309,6 @@ class GradientPenaltyWGAN(object):
                 out_temp = out_temp/sample_weight
                 output = out_temp[:y.shape[0]]
                 print(np.max(output),np.min(output))
-                wav.write(test_path+"enhanced/"+name.split('/')[-1],16000,np.int16(output*32767))
+                temp_name = name.split('/')
+                wav.write(os.path.join(test_path,"enhanced",temp_name[-3],temp_name[-2],temp_name[-1]),16000,np.int16(output*32767))
+                # wav.write(test_path+"enhanced/"+name.split('/')[-1],16000,np.int16(output*32767))

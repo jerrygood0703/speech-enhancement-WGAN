@@ -13,7 +13,14 @@ class spec_Generator(object):
         self.n_shape = n_shape
         self.c_shape = c_shape
         self.name = "generator"
+
     def __call__(self, x, reuse=True):
+
+        def log10(x):
+              numerator = tf.log(x + 1e-12)
+              denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
+              return numerator / denominator
+
         ''' Can be conditioned on `y` or not '''
         ngf = 16
         # nc, nh, nw = self.n_shape
@@ -25,7 +32,7 @@ class spec_Generator(object):
                 vs.reuse_variables()
         # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
             with tf.device('/gpu:0'):
-                output = conv2d(x, ngf, [3,3], [1,1,1,1], name="encoder_1")
+                output = conv2d(x, ngf, [11,3], [1,1,1,1], name="encoder_1")
                 layers.append(output)
 
                 layer_specs = [
@@ -41,7 +48,7 @@ class spec_Generator(object):
                     name = "encoder_%d" % (len(layers) + 1)
                     rectified = activation(layers[-1], 'prelu', name+'_activation')
                     # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
-                    output = conv2d(rectified, out_channels, [3,3], [1,1,2,2], name=name)
+                    output = conv2d(rectified, out_channels, [11,3], [1,1,2,2], name=name)
                     output = tf.layers.batch_normalization(output, axis=1, name=name+'_bn')
 
                     layers.append(output)
@@ -69,8 +76,8 @@ class spec_Generator(object):
 
                     rectified = activation(input, 'prelu', name+'_activation')
                     # [batch, in_height, in_width, in_channels] => [batch, in_height*2, in_width*2, out_channels]
-                    output = deconv2D_up(rectified, out_channels, [3,3], [1,1,1,1], name=name)
-                    # output = batchnorm(output)
+                    output = deconv2D_up(rectified, out_channels, [11,3], [1,1,1,1], name=name)
+                    output = tf.layers.batch_normalization(output, axis=1, name=name+'_bn')
 
                     # if dropout > 0.0:
                     #     output = tf.nn.dropout(output, keep_prob=1 - dropout)
@@ -81,13 +88,18 @@ class spec_Generator(object):
                 input = tf.concat([layers[-1], layers[0]], axis=1)
                 name = 'decoder_1'
                 rectified = activation(input, 'prelu', name+'_activation')
-                output = conv2d(rectified, ngf, [3,3], [1,1,1,1], name=name)
+                output = conv2d(rectified, ngf, [11,3], [1,1,1,1], name=name)
                 layers.append(output)
 
                 name = 'output_layers'
                 rectified = activation(layers[-1], 'prelu', name+'_activation')
-                output = conv2d(rectified, 1, [3,3], [1,1,1,1], name=name)
+                output = conv2d(rectified, 1, [1,1], [1,1,1,1], name=name)
+                output = tf.sigmoid(output)
                 layers.append(output)
+
+                # name = 'mask'
+                # masked = tf.add(log10(layers[-1]), x)
+
         for l in layers:
             print(l.get_shape())
         return layers[-1]
@@ -110,7 +122,7 @@ class spec_Discriminator(object):
                 # 2x [batch, in_channels, height, width] => [batch, in_channels * 2, height, width]
                 input = tf.concat([noisy, clean], axis=1)
                 name = 'dlayer_1'
-                convolved = conv2d(input, ndf, [3,3], [1,1,1,1], name=name)
+                convolved = conv2d(input, ndf, [11,3], [1,1,1,1], name=name)
                 rectified = activation(convolved, 'lrelu', name+'_activation')
                 layers.append(rectified)
 
@@ -121,7 +133,7 @@ class spec_Discriminator(object):
                     name = "dlayer_%d" % (len(layers) + 1)
                     out_channels = ndf * min(2**(i+1), 8)
                     stride = 1 if i == n_layers - 1 else 2  # last layer here has stride 1
-                    convolved = conv2d(layers[-1], out_channels, [3,3], [1,1,stride,stride], name=name)
+                    convolved = conv2d(layers[-1], out_channels, [11,3], [1,1,stride,stride], name=name)
                     normalized = layernorm(convolved, axis=[1, 2, 3], name=name+'_layernorm')
                     rectified = activation(normalized, 'lrelu', name+'_activation')
                     layers.append(rectified)
