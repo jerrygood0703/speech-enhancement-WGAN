@@ -9,10 +9,8 @@ import re
 
 
 class spec_Generator(object):
-    def __init__(self, n_shape, c_shape):
-        self.n_shape = n_shape
-        self.c_shape = c_shape
-        self.name = "generator"
+    def __init__(self, name="generator"):
+        self.name = name
     def __call__(self, x, reuse=True):
         ''' Can be conditioned on `y` or not '''
         ngf = 32
@@ -95,8 +93,8 @@ class spec_Generator(object):
         return [var for var in tf.global_variables() if self.name in var.name]
 
 class spec_Discriminator(object):
-    def __init__(self):
-        self.name = "discriminator"
+    def __init__(self, name="discriminator"):
+        self.name = name
     def __call__(self, noisy, clean, reuse=True):       
         n_layers = 4
         ndf = 64
