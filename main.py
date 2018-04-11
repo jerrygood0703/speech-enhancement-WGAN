@@ -35,10 +35,10 @@ test_list = "/mnt/gv0/user_sylar/segan_data/noisy_test_list"
 record_name = "/data_wave.tfrecord"
 
 if use_waveform:
-    G=Generator((1,2,3),(1,2,3))
+    G=Generator()
     D=Discriminator()
 else:
-    G=spec_Generator((1,2,3),(1,2,3))
+    G=spec_Generator()
     D=spec_Discriminator()
 
 def check_dir(path_name):
