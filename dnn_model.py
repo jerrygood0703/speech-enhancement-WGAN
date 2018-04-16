@@ -94,7 +94,7 @@ class spec_Generator(object):
 
     @property
     def vars(self):
-        return [var for var in tf.global_variables() if self.name in var.name]
+        return [var for var in tf.global_variables() if self.name == var.name.split('/')[0]]
 
 class spec_Discriminator(object):
     def __init__(self):
@@ -148,5 +148,5 @@ class spec_Discriminator(object):
 
     @property
     def vars(self):
-        return [var for var in tf.global_variables() if self.name in var.name]   
+        return [var for var in tf.global_variables() if self.name == var.name.split('/')[0]]   
             
